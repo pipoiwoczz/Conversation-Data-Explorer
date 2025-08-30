@@ -1,0 +1,10 @@
+fastapi==0.115.5
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+sqlalchemy==2.0.35
+pandas==2.2.3
+sqlglot==25.14.0
+httpx==0.27.2
+openai
+python-dotenv
+google-genai
