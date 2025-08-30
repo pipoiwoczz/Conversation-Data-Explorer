@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .schema import AskRequest, AskResponse
 from api import guards
-from .exec import run_sql
+from .exec import run_sql, get_engine
 from .llm import build_prompt, call_llm
 from .chart import validate_chart
 from api import cache
@@ -36,12 +36,27 @@ Tables:
   - InvoiceLine(InvoiceLineId, InvoiceId, TrackId, UnitPrice, Quantity)
 """.strip()
 
-
+# start_up 
+@app.get("/")
+async def root():
+    return {"status": "ok", "docs": "/docs", "health": "/health", "db": "/db"}
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
+@app.get("/db")
+async def db_health():
+    """
+    Simple DB connectivity probe. Works for Postgres on Render and SQLite locally.
+    If your managed Postgres requires SSL, ensure DATABASE_URL includes ?sslmode=require.
+    """
+    try:
+        with get_engine().connect() as conn:
+            val = conn.execute(text("SELECT 1")).scalar()
+        return {"db": val}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB error: {e}")
 
 @app.post("/ask", response_model=AskResponse)
 async def ask(payload: AskRequest):

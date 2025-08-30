@@ -102,10 +102,7 @@ def call_llm(schema_text: str, question: str) -> Dict[str, Any]:
         res = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=build_prompt(schema_text, question),
-            config=types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_budget=0),  # disable "thinking"
-                response_mime_type="application/json",
-            ),
+            config={"response_mime_type": "application/json"},
         )
         # Gemini response text is plain text, so parse as JSON
         try:
