@@ -3,6 +3,7 @@ from typing import Any, Dict
 import json
 from settings import settings
 from openai import OpenAI
+from .schema import build_schema_text
 
 SYSTEM_PROMPT = (
     "You are a skilled data analyst and SQL expert. "
@@ -50,8 +51,8 @@ SYSTEM_PROMPT = (
 def build_prompt(schema_text: str, question: str) -> str:
     return f"""{SYSTEM_PROMPT}\n\nSCHEMA:\n{schema_text}\n\nQUESTION:\n\"{question}\"\n"""
 
-def call_llm(schema_text: str, question: str) -> Dict[str, Any]:
-    provider = settings.llm_provider
+def call_llm(schema_text: str, question: str, provider: str) -> Dict[str, Any]:
+    # provider = settings.llm_provider
     print("Current provider:", provider)
 
     # ------------------------
@@ -119,3 +120,8 @@ def call_llm(schema_text: str, question: str) -> Dict[str, Any]:
     # ------------------------
     else:
         raise ValueError(f"Unsupported LLM provider: {provider}")
+
+
+def ask_provider(question: str, provider: str, db_path: str) -> Dict[str, Any]:
+    schema_text = build_schema_text(db_path)
+    return call_llm(schema_text, question, provider)

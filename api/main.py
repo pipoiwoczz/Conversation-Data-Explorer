@@ -1,16 +1,38 @@
+# main.py
 from __future__ import annotations
-from fastapi import FastAPI, HTTPException
+import os, json, re
+from typing import Any, Dict, List, Optional, Tuple
+from fastapi import FastAPI, HTTPException, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
-from .schema import AskRequest, AskResponse
-from api import guards
-from .exec import run_sql, get_engine
-from .llm import build_prompt, call_llm
-from .chart import validate_chart
-from api import cache
-from settings import settings
+import sqlite3
+from sqlalchemy import text
 
+from .guards import is_safe as is_safe_sql
+from .guards import enforce_limit
+from .schema import build_schema_text
+from .exec import run_sql
+from .llm import ask_provider
 
-app = FastAPI(title="Conversational Data Explorer API")
+# ---- DB Routing ----
+# Map the DB ids used by the frontend to actual SQLite files.
+# Update paths as you add more demo DBs.
+DB_MAP = {
+    "chinook": os.getenv("DB_CHINOOK", "data/chinook.db"),
+    "marketing": os.getenv("DB_MARKETING", "data/marketing.db"),
+    "ecommerce": os.getenv("DB_ECOMMERCE", "data/ecommerce.db"),
+    "hr": os.getenv("DB_HR", "data/hr.db"),
+}
+
+def get_db_path(db_id: str) -> str:
+    if db_id not in DB_MAP:
+        raise HTTPException(status_code=400, detail=f"Unknown db '{db_id}'. Valid: {list(DB_MAP)}")
+    path = DB_MAP[db_id]
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail=f"Database file not found: {path}")
+    return path
+
+app = FastAPI(title="Conversation Data Explorer API", version="0.2.0")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,96 +41,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-SCHEMA_TEXT = """
-# Chinook sample database schema (SQLite)
-Tables:
-  - Artist(ArtistId, Name)
-  - Album(AlbumId, Title, ArtistId)
-  - Track(TrackId, Name, AlbumId, MediaTypeId, GenreId, Composer, Milliseconds, Bytes, UnitPrice)
-  - Genre(GenreId, Name)
-  - MediaType(MediaTypeId, Name)
-  - Playlist(PlaylistId, Name)
-  - PlaylistTrack(PlaylistId, TrackId)
-  - Customer(CustomerId, FirstName, LastName, Company, Address, City, State, Country, PostalCode, Phone, Fax, Email, SupportRepId)
-  - Employee(EmployeeId, LastName, FirstName, Title, ReportsTo, BirthDate, HireDate, Address, City, State, Country, PostalCode, Phone, Fax, Email)
-  - Invoice(InvoiceId, CustomerId, InvoiceDate, BillingAddress, BillingCity, BillingState, BillingCountry, BillingPostalCode, Total)
-  - InvoiceLine(InvoiceLineId, InvoiceId, TrackId, UnitPrice, Quantity)
-""".strip()
-
-# start_up 
 @app.get("/")
-async def root():
-    return {"status": "ok", "docs": "/docs", "health": "/health", "db": "/db"}
+def root():
+    return {"message": "Welcome to the Conversation Data Explorer API"}
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+def health():
+    return {"ok": True}
 
-@app.get("/db")
-async def db_health():
-    """
-    Simple DB connectivity probe. Works for Postgres on Render and SQLite locally.
-    If your managed Postgres requires SSL, ensure DATABASE_URL includes ?sslmode=require.
-    """
-    try:
-        with get_engine().connect() as conn:
-            val = conn.execute(text("SELECT 1")).scalar()
-        return {"db": val}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DB error: {e}")
+# ---------- NEW: schema endpoint ----------
+@app.get("/schema", response_model=None)
+def get_schema(db: str = Query(..., description="db id, e.g., chinook")):
+    db_path = get_db_path(db)
+    if not db_path:
+        raise HTTPException(status_code=404, detail="Database not found")
+    return build_schema_text(db_path)  # returns plain text; frontend expects text
 
-@app.post("/ask", response_model=AskResponse)
-async def ask(payload: AskRequest):
-    qnorm = payload.question.strip()
-    if len(qnorm) < 2:
-        raise HTTPException(status_code=400, detail="Question too short.")
+# ---------- NEW: safe SQL exec endpoint ----------
+@app.post("/exec")
+def exec_sql(payload: Dict[str, Any] = Body(...)):
+    sql: str = payload.get("sql", "")
+    db: str = payload.get("db", "chinook")
 
-    ck = cache.key_for(qnorm)
-    cached = cache.get(ck)
-    if cached:
-        print("Cache hit")
-        return cached
+    if not sql.strip():
+        raise HTTPException(status_code=400, detail="Missing 'sql'")
 
-
-    prompt = build_prompt(SCHEMA_TEXT, qnorm)
-    print("Prompt:", prompt)
-    llm_json = call_llm(SCHEMA_TEXT, qnorm)
-    print("LLM response:", llm_json)
-
-    # Guardrails
-    sql = llm_json.get("sql", "").strip().replace("\n", " ").replace("\r", " ").replace("  ", " ")
-    print("Generated SQL:", sql)
-    ok, reason = guards.is_safe(sql, settings.allow_tables)
-    if not ok:
-        raise HTTPException(status_code=400, detail=f"Unsafe SQL: {reason}")
-
-
-    sql = guards.enforce_limit(sql)
-    print("Final SQL with enforced LIMIT:", sql)
+    sql = enforce_limit(sql).replace("\n", " ").strip().rstrip(";")
+    if not is_safe_sql(sql):
+        raise HTTPException(status_code=400, detail="Only SELECT/EXPLAIN queries are allowed.")
 
     try:
-        rows, cols = run_sql(sql)
-        print(f"SQL returned {len(rows)} rows, columns: {cols}")
+        rows, columns = run_sql(db, sql)
+        print(f"Executed SQL on {db}: {sql}")
+        print("Returned columns and rows: ", columns, rows)
+        return {"columns": columns, "rows": rows}
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"SQL error: {e}")
+
+# ---------- NEW: ask endpoint with provider & db ----------
+@app.post("/ask")
+def ask(payload: Dict[str, Any] = Body(...)):
+    question: str = payload.get("question", "")
+    provider: str = payload.get("provider", "gemini")
+    db: str = payload.get("db", "chinook")
+    db_path = get_db_path(db)
+    print("Provider selected:", provider)
+    print("Database path resolved to:", db_path)
+
+    if not question.strip():
+        raise HTTPException(status_code=400, detail="Missing 'question'")
+
+    try:
+        answer = ask_provider(question=question, provider=provider, db_path=db_path)
+        return {"answer": answer}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"SQL execution failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Ask failed: {e}")
 
-
-    chart = validate_chart(llm_json.get("chart"), cols) if payload.want_chart else validate_chart({}, cols)
-    # rows, cols, chart = [], [], {}
-    # Optional: second-pass explanation LLM; here we synthesize a simple one
-    explanation = llm_json.get("reasoning") or "Answer computed based on the generated SQL and result set."
-
-
-    resp = AskResponse(
-        sql=sql,
-        rows=rows,
-        columns=cols,
-        explanation=explanation,
-        chart=chart,
-        assumptions=None,
-    )
-
-    cache.set(ck, resp)
-
-    return resp
+# ---------- Legacy: /sql (optional, keep for backwards-compat) ----------
+# If you want to preserve older clients, you can route it to the “SQL assistant”
+# model that generates SQL — or simply reject/redirect. Here we return 410 Gone.
+@app.post("/sql")
+def legacy_sql():
+    raise HTTPException(status_code=410, detail="Deprecated. Use /schema and /exec instead.")

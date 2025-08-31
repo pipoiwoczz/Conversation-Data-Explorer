@@ -2,7 +2,7 @@ import re
 from typing import Iterable
 from sqlglot import parse_one
 from sqlglot.expressions import Table
-
+from settings import settings
 
 BAD_KEYWORDS = (
 "insert", "update", "delete", "drop", "alter", "create",
@@ -37,7 +37,7 @@ def enforce_limit(sql: str, default_limit: int = 200) -> str:
         return sql # aggregated result generally small
     return sql.rstrip("; ") + f" LIMIT {default_limit}"
 
-def is_safe(sql: str, allowed_tables: set[str]) -> tuple[bool, str]:
+def is_safe(sql: str, allowed_tables: set[str] = settings.allow_tables) -> tuple[bool, str]:
     if not sql.strip():
         return False, "Empty SQL"
 
