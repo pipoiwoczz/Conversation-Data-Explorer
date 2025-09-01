@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: cde-api
+    env_file:
+      - .env
+    environment:
+      # Fallbacks if .env isn't set
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/chinook.db}
+      - LLM_PROVIDER=${LLM_PROVIDER:-dummy}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-"AIzaSyBAq8XHh-dQbNHmb5pKo7_15byNed5cEHM"}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: front-end/Dockerfile
+      # args:
+        # This becomes import.meta.env.VITE_API_BASE at build time (see Dockerfile)
+        # VITE_API_BASE: ${BASE_API:-http://localhost:8000}
+    container_name: cde-web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5173:5173"

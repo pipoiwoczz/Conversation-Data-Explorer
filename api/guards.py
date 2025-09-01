@@ -2,7 +2,7 @@ import re
 from typing import Iterable
 from sqlglot import parse_one
 from sqlglot.expressions import Table
-from settings import settings
+from .settings import settings
 
 BAD_KEYWORDS = (
 "insert", "update", "delete", "drop", "alter", "create",

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { CodeBlock } from "@/components/ui/codeblock";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
+import { Button } from "../ui/button";
+import { CodeBlock } from "../ui/codeblock";
 import { FileText, RefreshCw, Send } from "lucide-react";
 import {
   BarChart,
@@ -19,8 +19,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { s } from "framer-motion/client";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
 type ChartSpec = {
   type: "bar" | "line" | "scatter" | "none";
@@ -37,13 +37,11 @@ type AskAnswer = {
 };
 
 const PROVIDERS = [
-  { label: "OpenAI", value: "openai" },
   { label: "Gemini", value: "gemini" },
+  { label: "OpenAI", value: "openai" },
   { label: "Groq", value: "groq" },
   { label: "Ollama", value: "ollama" },
 ];
-
-const API_BASE = (import.meta as any)?.env?.VITE_API_BASE ?? "http://localhost:8000";
 
 function demoData(chart?: ChartSpec | null) {
   const xs = Array.from({ length: 10 }, (_, i) => i + 1);
@@ -94,7 +92,7 @@ function ChartRenderer({ chart, data }: { chart: ChartSpec | null | undefined; d
 
 export function AskPanel({ db }: { db: string }) {
     const [prompt, setPrompt] = useState("");
-    const [provider, setProvider] = useState<string>(PROVIDERS[1].value);
+    const [provider, setProvider] = useState<string>(PROVIDERS[0].value);
     const [answer, setAnswer] = useState<AskAnswer | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

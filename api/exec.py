@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from settings import settings
+from .settings import settings
 from .guards import enforce_limit
 
 _engines: Dict[str, Engine] | None = None

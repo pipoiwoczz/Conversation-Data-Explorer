@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Database, Play, RefreshCw, Send, Download } from "lucide-react";
-import { API_BASE } from "@/assets/const";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
+import { Button } from "../ui/button";
+import { Database, Play, RefreshCw, Download } from "lucide-react";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
 function exportRowsToCSV(columns: string[], rows: any[], filename = "query-results.csv") {
   const esc = (val: any) => {

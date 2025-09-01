@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
-    "types": ["node", "vite/client"],
+    "typeRoots": ["./node_modules/@types"],
+    "skipLibCheck": true,               // avoids churn from deep deps (optional but helpful)
+    "strict": true,
     "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] },
-    "skipLibCheck": true
+    "paths": { "@/*": ["src/*"] }
   }
 }

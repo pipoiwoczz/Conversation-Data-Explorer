@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 import json
-from settings import settings
+from .settings import settings
 from openai import OpenAI
 from .schema import build_schema_text
 

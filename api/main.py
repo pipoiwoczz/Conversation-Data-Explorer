@@ -13,9 +13,7 @@ from .schema import build_schema_text
 from .exec import run_sql
 from .llm import ask_provider
 
-# ---- DB Routing ----
 # Map the DB ids used by the frontend to actual SQLite files.
-# Update paths as you add more demo DBs.
 DB_MAP = {
     "chinook": os.getenv("DB_CHINOOK", "data/chinook.db"),
     "marketing": os.getenv("DB_MARKETING", "data/marketing.db"),
@@ -49,16 +47,14 @@ def root():
 def health():
     return {"ok": True}
 
-# ---------- NEW: schema endpoint ----------
-@app.get("/schema", response_model=None)
+@app.get("/api/schema", response_model=None)
 def get_schema(db: str = Query(..., description="db id, e.g., chinook")):
     db_path = get_db_path(db)
     if not db_path:
         raise HTTPException(status_code=404, detail="Database not found")
     return build_schema_text(db_path)  # returns plain text; frontend expects text
 
-# ---------- NEW: safe SQL exec endpoint ----------
-@app.post("/exec")
+@app.post("/api/exec")
 def exec_sql(payload: Dict[str, Any] = Body(...)):
     sql: str = payload.get("sql", "")
     db: str = payload.get("db", "chinook")
@@ -78,8 +74,7 @@ def exec_sql(payload: Dict[str, Any] = Body(...)):
     except sqlite3.Error as e:
         raise HTTPException(status_code=400, detail=f"SQL error: {e}")
 
-# ---------- NEW: ask endpoint with provider & db ----------
-@app.post("/ask")
+@app.post("/api/ask")
 def ask(payload: Dict[str, Any] = Body(...)):
     question: str = payload.get("question", "")
     provider: str = payload.get("provider", "gemini")
@@ -97,9 +92,3 @@ def ask(payload: Dict[str, Any] = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ask failed: {e}")
 
-# ---------- Legacy: /sql (optional, keep for backwards-compat) ----------
-# If you want to preserve older clients, you can route it to the “SQL assistant”
-# model that generates SQL — or simply reject/redirect. Here we return 410 Gone.
-@app.post("/sql")
-def legacy_sql():
-    raise HTTPException(status_code=410, detail="Deprecated. Use /schema and /exec instead.")

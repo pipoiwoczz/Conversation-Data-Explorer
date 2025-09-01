@@ -1,16 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { useState } from "react";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/components/ui/tabs";
-import { AskPanel } from "@/components/panel/askPanel";
+} from "./components/ui/tabs";
+import { AskPanel } from "./components/panel/askPanel";
 import { SQLPanel } from "./components/panel/sqlPanel";
 import { Navbar, Footer } from "./components/navbar/navbar";
 
-// const API_BASE = "https://conversation-data-explorer.onrender.com" || ""; // e.g. "https://your.render.app"
 
 const DB_OPTIONS = [
   { label: "Chinook (SQLite)", value: "chinook" },
