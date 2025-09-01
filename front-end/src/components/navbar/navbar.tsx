@@ -38,6 +38,6 @@ export function Navbar({ db, onChangeDb }: { db: string; onChangeDb: (v: string)
 
 export function Footer() {
   return (
-    <div className="py-10 text-center text-xs text-zinc-500">© {new Date().getFullYear()} Your Name • Built with ❤️</div>
+    <div className="py-10 text-center text-xs text-zinc-500">© {new Date().getFullYear()} • pipoiwoczz</div>
   );
 }
